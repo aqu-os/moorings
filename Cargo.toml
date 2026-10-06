@@ -1,6 +1,6 @@
 [package]
 name = "moorings"
-description = "Generational handle tables for no_std: stable, unique keys with fallible allocation. Parked for now."
+description = "Generational handle tables for no_std: values that never move, unique keys that can't outlive what they name, and only fallible allocation."
 version = "0.0.0"
 edition.workspace = true
 authors.workspace = true
@@ -8,8 +8,21 @@ rust-version.workspace = true
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/aqu-os/aquos"
 readme = "README.md"
-keywords = ["generational", "slotmap", "handle", "no-std"]
-categories = ["data-structures", "no-std"]
+keywords = ["generational", "slotmap", "handle", "no-std", "arena"]
+categories = ["data-structures", "no-std", "memory-management"]
 
 [lints]
 workspace = true
+
+[features]
+default = ["alloc"]
+# `GlobalChunks`: tables allocate from the global allocator (through its
+# fallible raw interface - stable Rust is enough).
+alloc = []
+# `InAllocator`: tables allocate from any `core::alloc::Allocator`. Needs a
+# nightly toolchain (`allocator_api`).
+nightly = []
+
+[[test]]
+name = "moorings"
+required-features = ["alloc"]
