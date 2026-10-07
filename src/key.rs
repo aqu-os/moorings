@@ -3,6 +3,8 @@
 use core::fmt;
 use core::marker::PhantomData;
 
+use crate::generation::Generation;
+
 /// The one handle to a value in a [`Moorings<T, _>`](crate::Moorings): which
 /// slot it's in, and that slot's generation when it was put there.
 ///
@@ -24,7 +26,7 @@ pub struct Key<T> {
     /// The slot the value is in.
     index: usize,
     /// The slot's generation when the value was put there.
-    generation: u64,
+    generation: Generation,
     /// What the table holds, without affecting `Send`/`Sync`.
     _value: PhantomData<fn() -> T>,
 }
@@ -37,7 +39,7 @@ impl<T> Key<T> {
     }
 
     /// The key for slot `index` at `generation`.
-    pub(crate) const fn new(index: usize, generation: u64) -> Self {
+    pub(crate) const fn new(index: usize, generation: Generation) -> Self {
         Self {
             index,
             generation,
@@ -51,7 +53,7 @@ impl<T> Key<T> {
     }
 
     /// The slot's generation when the value was put there.
-    pub(crate) const fn generation(&self) -> u64 {
+    pub(crate) const fn generation(&self) -> Generation {
         self.generation
     }
 }

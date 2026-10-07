@@ -16,6 +16,7 @@ extern crate alloc;
 extern crate std;
 
 mod allocator;
+mod generation;
 mod key;
 mod table;
 

@@ -7,6 +7,7 @@ use core::ptr::NonNull;
 
 #[cfg(feature = "alloc")]
 use crate::GlobalChunks;
+use crate::generation::Generation;
 use crate::{ChunkAllocator, InsertError, Key, SlotId};
 
 /// The first chunk's size, as a power of two: 8 slots. Each chunk after it is
@@ -22,14 +23,15 @@ enum Slot<T> {
     /// Holds a value.
     Occupied {
         /// The generation the value was put in at - what its key carries.
-        generation: u64,
+        generation: Generation,
         /// The value.
         value: T,
     },
     /// Empty.
     Vacant {
-        /// The generation the next value put here gets.
-        generation: u64,
+        /// The generation the next value put here gets - or
+        /// [`Generation::RETIRED`], for a slot no value is put in again.
+        generation: Generation,
         /// The next empty slot on the free list, or [`NO_SLOT`] (also for a
         /// retired slot, which isn't on the list at all).
         next_free:  usize,
@@ -179,7 +181,11 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
 
     /// Takes the value out of slot `index` - if it holds one, and (if
     /// `generation` is given) one put there at that generation.
-    fn take(&mut self, index: usize, generation: Option<u64>) -> Option<T> {
+    fn take(
+        &mut self,
+        index: usize,
+        generation: Option<Generation>,
+    ) -> Option<T> {
         let mut slot = self.slot(index)?;
         // SAFETY: a written slot (see `slot`), and `&mut self` rules out
         // any other access.
@@ -194,16 +200,20 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
 
         // The next value here gets a new generation - or, if there's none
         // left, the slot is retired: never reused, so no old key can match.
-        let next = current.checked_add(1);
+        let next = current.next();
         let vacant = Slot::Vacant {
-            generation: next.unwrap_or(current),
-            next_free:  if next.is_some() { self.free } else { NO_SLOT },
+            generation: next,
+            next_free:  if next.is_retired() {
+                NO_SLOT
+            } else {
+                self.free
+            },
         };
         let Slot::Occupied { value, .. } = core::mem::replace(slot, vacant)
         else {
             unreachable!("checked to be occupied just above");
         };
-        if next.is_some() {
+        if !next.is_retired() {
             self.free = index;
         }
         self.len -= 1;
@@ -268,7 +278,8 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
                 else {
                     return Err(InsertError::new(value));
                 };
-                // `Slot` holds a `u64`, so the layout is never zero-sized.
+                // `Slot` holds a `Generation` (64 bits), so the layout is
+                // never zero-sized.
                 let Some(first) = self.alloc.allocate(layout) else {
                     return Err(InsertError::new(value));
                 };
@@ -281,12 +292,12 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
         // allocated, and slot `index` has never been written.
         unsafe {
             first.add(offset).write(Slot::Occupied {
-                generation: 0,
+                generation: Generation::FIRST,
                 value,
             });
         }
         self.initialised += 1;
-        Ok(Key::new(index, 0))
+        Ok(Key::new(index, Generation::FIRST))
     }
 }
 
@@ -363,17 +374,19 @@ mod tests {
         let mut table = Moorings::<u32, _>::new();
         let key = table.try_insert(1).expect("memory");
         // Fast-forward slot 0 to its last generation.
+        let last_generation = Generation::new(u64::MAX);
         let mut slot = table.slot(key.index()).expect("written");
         // SAFETY: a written slot, and nothing else uses the table meanwhile.
         if let Slot::Occupied { generation, .. } = unsafe { slot.as_mut() } {
-            *generation = u64::MAX;
+            *generation = last_generation;
         }
-        let last = Key::new(key.index(), u64::MAX);
+        let last = Key::new(key.index(), last_generation);
 
         assert_eq!(table.remove(last), Some(1));
         let next = table.try_insert(2).expect("memory");
         assert_eq!(next.index(), 1, "slot 0 is retired, not reused");
-        assert_eq!(table.get(&Key::new(0, u64::MAX)), None);
+        assert_eq!(table.get(&Key::new(0, last_generation)), None);
+        assert_eq!(table.get(&Key::new(0, Generation::RETIRED)), None);
         assert_eq!(table.len(), 1);
     }
 }

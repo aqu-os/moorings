@@ -28,11 +28,11 @@ fn a_value_is_found_by_its_key_until_removed() {
 fn a_reused_slot_gets_a_new_generation() {
     let mut table = Moorings::new();
     let first = table.try_insert(1).expect("memory");
-    assert_eq!(first.to_string(), "slot 0, generation 0");
+    assert_eq!(first.to_string(), "slot 0, generation 1");
     table.remove(first);
 
     let second = table.try_insert(2).expect("memory");
-    assert_eq!(format!("{second:?}"), "slot 0, generation 1");
+    assert_eq!(format!("{second:?}"), "slot 0, generation 2");
     assert_eq!(table.get(&second), Some(&2));
 }
 
@@ -101,15 +101,15 @@ fn freed_slots_are_reused_last_freed_first() {
 
     assert_eq!(
         table.try_insert('d').expect("memory").to_string(),
-        "slot 1, generation 1"
+        "slot 1, generation 2"
     );
     assert_eq!(
         table.try_insert('e').expect("memory").to_string(),
-        "slot 0, generation 1"
+        "slot 0, generation 2"
     );
     assert_eq!(
         table.try_insert('f').expect("memory").to_string(),
-        "slot 3, generation 0"
+        "slot 3, generation 1"
     );
 }
 
@@ -232,7 +232,7 @@ fn running_out_of_memory_later_leaves_what_is_there_intact() {
     // Once there's memory again, the table grows as if nothing happened.
     chunks.limit.set(2);
     let ninth = table.try_insert(8).expect("memory again");
-    assert_eq!(ninth.to_string(), "slot 8, generation 0");
+    assert_eq!(ninth.to_string(), "slot 8, generation 1");
 }
 
 #[test]
