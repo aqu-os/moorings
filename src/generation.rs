@@ -29,9 +29,10 @@ impl Generation {
         }
     }
 
-    /// Whether the slot is out of generations - see [`Self::RETIRED`].
-    pub(crate) const fn is_retired(self) -> bool {
-        self.0.is_none()
+    /// The generation's number - `None` once the slot is out of them (see
+    /// [`Self::RETIRED`]), so whoever asks has to say what happens then.
+    pub(crate) const fn live(self) -> Option<NonZero<u64>> {
+        self.0
     }
 
     /// Generation `generation` (0 being [`Self::RETIRED`]) - for tests that
@@ -74,8 +75,9 @@ mod tests {
         assert_eq!(Generation::FIRST, Generation::new(1));
         assert_eq!(Generation::FIRST.next(), Generation::new(2));
         let last = Generation::new(u64::MAX);
-        assert!(!last.is_retired());
+        assert_eq!(last.live(), NonZero::new(u64::MAX));
         assert_eq!(last.next(), Generation::RETIRED);
+        assert_eq!(Generation::RETIRED.live(), None);
         assert_eq!(Generation::RETIRED.next(), Generation::RETIRED);
     }
 

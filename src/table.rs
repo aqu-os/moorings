@@ -198,24 +198,23 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
             _ => return None,
         };
 
-        // The next value here gets a new generation - or, if there's none
-        // left, the slot is retired: never reused, so no old key can match.
         let next = current.next();
+        let next_free = match next.live() {
+            // The next value here gets the new generation: back on the free
+            // list, at its front.
+            Some(_) => core::mem::replace(&mut self.free, index),
+            // None left: the slot is retired - never reused, so no old key
+            // can match.
+            None => NO_SLOT,
+        };
         let vacant = Slot::Vacant {
             generation: next,
-            next_free:  if next.is_retired() {
-                NO_SLOT
-            } else {
-                self.free
-            },
+            next_free,
         };
         let Slot::Occupied { value, .. } = core::mem::replace(slot, vacant)
         else {
             unreachable!("checked to be occupied just above");
         };
-        if !next.is_retired() {
-            self.free = index;
-        }
         self.len -= 1;
         Some(value)
     }
