@@ -172,6 +172,11 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
         }
     }
 
+    /// Whether `slot` currently holds a value - see [`SlotId`](crate::SlotId).
+    pub fn contains_slot(&self, slot: SlotId<T>) -> bool {
+        self.get_slot(slot).is_some()
+    }
+
     /// Takes whatever value is in `slot` now out of the table, without its
     /// key - see [`SlotId`](crate::SlotId). Its key, wherever it is, finds
     /// nothing from then on.

@@ -44,11 +44,13 @@ fn the_owner_can_reach_and_remove_a_value_without_its_key() {
     assert_eq!(slot.to_string(), "slot 0");
     assert_eq!(format!("{slot:?}"), "slot 0");
 
+    assert!(table.contains_slot(slot));
     assert_eq!(table.get_slot(slot), Some(&1));
     *table.get_slot_mut(slot).expect("there") += 1;
     assert_eq!(table.get(&key), Some(&2), "the same value");
 
     assert_eq!(table.remove_slot(slot), Some(2));
+    assert!(!table.contains_slot(slot));
     assert_eq!(table.get_slot(slot), None);
     assert_eq!(table.get_slot_mut(slot), None);
     assert_eq!(table.remove_slot(slot), None);
