@@ -106,6 +106,12 @@ impl<T> PartialEq for SlotId<T> {
 
 impl<T> Eq for SlotId<T> {}
 
+impl<T> core::hash::Hash for SlotId<T> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+    }
+}
+
 // Meant to be read: "slot 3".
 impl<T> fmt::Display for SlotId<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -116,6 +122,21 @@ impl<T> fmt::Display for SlotId<T> {
 impl<T> fmt::Debug for SlotId<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
+    }
+}
+
+impl<T> PartialEq for Key<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index && self.generation == other.generation
+    }
+}
+
+impl<T> Eq for Key<T> {}
+
+impl<T> core::hash::Hash for Key<T> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+        self.generation.hash(state);
     }
 }
 

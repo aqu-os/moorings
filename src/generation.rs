@@ -10,7 +10,7 @@ use core::num::NonZero;
 /// `None` is [`Self::RETIRED`]: the generations ran out. Counting starts at 1
 /// so that `None` can take 0's place - still 64 bits, and every use has to
 /// say what happens to a retired slot.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Generation(Option<NonZero<u64>>);
 
 impl Generation {

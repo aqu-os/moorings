@@ -259,3 +259,32 @@ fn any_allocator_can_back_the_table() {
     let key = table.try_insert("anchored").expect("memory");
     assert_eq!(table.remove(key), Some("anchored"));
 }
+
+#[test]
+fn key_and_slot_support_equality_and_hashing() {
+    use std::collections::HashSet;
+
+    let mut table = Moorings::new();
+    let k1 = table.try_insert(10).expect("memory");
+    let k2 = table.try_insert(20).expect("memory");
+
+    assert_eq!(k1, k1);
+    assert_ne!(k1, k2);
+
+    let s1 = k1.slot();
+    let s2 = k2.slot();
+    assert_eq!(s1, s1);
+    assert_ne!(s1, s2);
+
+    let mut slot_set = HashSet::new();
+    slot_set.insert(s1);
+    slot_set.insert(s2);
+    assert_eq!(slot_set.len(), 2);
+    assert!(slot_set.contains(&s1));
+
+    let mut key_set = HashSet::new();
+    key_set.insert(&k1);
+    key_set.insert(&k2);
+    assert_eq!(key_set.len(), 2);
+    assert!(key_set.contains(&k1));
+}
