@@ -235,6 +235,37 @@ fn running_out_of_memory_later_leaves_what_is_there_intact() {
     assert_eq!(ninth.to_string(), "slot 8, generation 1");
 }
 
+/// A value that knows its own slot.
+struct Tied(&'static str, moorings::SlotId<Tied>);
+
+#[test]
+fn a_value_can_be_built_knowing_its_slot() {
+    let mut table = Moorings::new();
+    let first = table.try_insert_with("first", Tied).expect("memory");
+    let second = table.try_insert_with("second", Tied).expect("memory");
+    let tied = table.get(&second).expect("there");
+    assert_eq!((tied.0, tied.1), ("second", second.slot()));
+
+    // A reused slot is told too.
+    let reused = first.slot();
+    table.remove(first);
+    let third = table.try_insert_with("third", Tied).expect("memory");
+    assert_eq!(third.slot(), reused);
+    assert_eq!(table.get(&third).expect("there").1, reused);
+}
+
+#[test]
+fn out_of_memory_hands_the_parts_back_unbuilt() {
+    let chunks = CountingChunks::new(0);
+    let mut table = Moorings::<u32, _>::new_in(&chunks);
+
+    let error = table
+        .try_insert_with(42, |_, _| unreachable!("no slot to build for"))
+        .expect_err("no memory");
+    assert_eq!(error.into_inner(), 42);
+    assert!(table.is_empty());
+}
+
 #[test]
 fn debug_shows_how_full_it_is() {
     let mut table = Moorings::new();

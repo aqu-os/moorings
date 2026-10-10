@@ -24,6 +24,9 @@
 //! - **Fallible allocation**: Inserting into the table is strictly fallible
 //!   ([`try_insert`](Moorings::try_insert)), returning [`InsertError`] on OOM
 //!   rather than aborting.
+//! - **Values that know their slot**:
+//!   [`try_insert_with`](Moorings::try_insert_with) builds the value once its
+//!   slot is known, so it can hold its own [`SlotId`] from the start.
 //!
 //! # Access modes
 //!

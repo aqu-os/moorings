@@ -103,13 +103,24 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
     /// Puts `value` in the table and returns its key - or hands `value` back
     /// if there's no memory for it.
     pub fn try_insert(&mut self, value: T) -> Result<Key<T>, InsertError<T>> {
-        let key = if self.free == NO_SLOT {
-            self.insert_new(value)?
-        } else {
-            self.insert_reused(value)
+        self.try_insert_with(value, |value, _| value)
+    }
+
+    /// Puts the value `build` makes of `parts` in the table and returns its
+    /// key - or hands `parts` back, with `build` never called, if there's no
+    /// memory for it. `build` is told the slot the value goes in, so a value
+    /// can know its own [`SlotId`] from the start (an intrusive queue's entry,
+    /// say, finding its way back to the table).
+    pub fn try_insert_with<P>(
+        &mut self,
+        parts: P,
+        build: impl FnOnce(P, SlotId<T>) -> T,
+    ) -> Result<Key<T>, InsertError<P>> {
+        let Some(vacancy) = self.vacancy() else {
+            return Err(InsertError::new(parts));
         };
-        self.len += 1;
-        Ok(key)
+        let value = build(parts, SlotId::new(vacancy.index()));
+        Ok(self.occupy(vacancy, value))
     }
 
     /// The value `key` names, if it's still in the table.
@@ -246,62 +257,101 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
         Some(unsafe { first.add(offset) })
     }
 
-    /// Puts `value` in the free list's first slot.
-    fn insert_reused(&mut self, value: T) -> Key<T> {
-        let index = self.free;
-        let mut slot =
-            self.slot(index).expect("the free list holds written slots");
-        // SAFETY: a written slot (see `slot`), and `&mut self` rules out
-        // any other access.
-        let slot = unsafe { slot.as_mut() };
-        let Slot::Vacant {
-            generation,
-            next_free,
-        } = *slot
-        else {
-            unreachable!("the free list holds only empty slots");
-        };
-        *slot = Slot::Occupied { generation, value };
-        self.free = next_free;
-        Key::new(index, generation)
-    }
+    /// The slot the next value goes in: the free list's first, or else the
+    /// first never-used one, allocating its chunk if it's the first slot of
+    /// one. `None` if there's no memory for it. Changes nothing but which
+    /// chunks are allocated, so a value never put in leaves the table as it
+    /// was.
+    fn vacancy(&mut self) -> Option<Vacancy<T>> {
+        if self.free != NO_SLOT {
+            let index = self.free;
+            let slot =
+                self.slot(index).expect("the free list holds written slots");
+            return Some(Vacancy::Reused { index, slot });
+        }
 
-    /// Puts `value` in the first never-used slot, allocating its chunk if
-    /// it's the first slot of one.
-    fn insert_new(&mut self, value: T) -> Result<Key<T>, InsertError<T>> {
         let index = self.initialised;
         // Every index's chunk is below `CHUNKS` (see the tests), so `chunk`
         // always indexes `chunks`.
-        let Some((chunk, offset)) = locate(index) else {
-            return Err(InsertError::new(value));
-        };
+        let (chunk, offset) = locate(index)?;
         let first = match self.chunks[chunk] {
             Some(first) => first,
             None => {
-                let Ok(layout) = Layout::array::<Slot<T>>(chunk_len(chunk))
-                else {
-                    return Err(InsertError::new(value));
-                };
+                let layout = Layout::array::<Slot<T>>(chunk_len(chunk)).ok()?;
                 // `Slot` holds a `Generation` (64 bits), so the layout is
                 // never zero-sized.
-                let Some(first) = self.alloc.allocate(layout) else {
-                    return Err(InsertError::new(value));
-                };
-                let first = first.cast();
+                let first = self.alloc.allocate(layout)?.cast();
                 self.chunks[chunk] = Some(first);
                 first
             },
         };
         // SAFETY: `offset` is within chunk `chunk` (see `locate`), which is
-        // allocated, and slot `index` has never been written.
-        unsafe {
-            first.add(offset).write(Slot::Occupied {
-                generation: Generation::FIRST,
-                value,
-            });
+        // allocated.
+        let slot = unsafe { first.add(offset) };
+        Some(Vacancy::New { index, slot })
+    }
+
+    /// Puts `value` in `vacancy`, which [`Self::vacancy`] just found.
+    fn occupy(&mut self, vacancy: Vacancy<T>, value: T) -> Key<T> {
+        let key = match vacancy {
+            Vacancy::Reused { index, mut slot } => {
+                // SAFETY: a written slot (see `slot`), and `&mut self` rules
+                // out any other access.
+                let slot = unsafe { slot.as_mut() };
+                let Slot::Vacant {
+                    generation,
+                    next_free,
+                } = *slot
+                else {
+                    unreachable!("the free list holds only empty slots");
+                };
+                *slot = Slot::Occupied { generation, value };
+                self.free = next_free;
+                Key::new(index, generation)
+            },
+            Vacancy::New { index, slot } => {
+                // SAFETY: in an allocated chunk (see `vacancy`), and never
+                // written: `initialised` hasn't moved past it yet.
+                unsafe {
+                    slot.write(Slot::Occupied {
+                        generation: Generation::FIRST,
+                        value,
+                    });
+                }
+                self.initialised += 1;
+                Key::new(index, Generation::FIRST)
+            },
+        };
+        self.len += 1;
+        key
+    }
+}
+
+/// Where the next value goes - see [`Moorings::vacancy`]. Only good until the
+/// table changes.
+enum Vacancy<T> {
+    /// The free list's first slot: written before, empty now.
+    Reused {
+        /// The slot's index.
+        index: usize,
+        /// The slot.
+        slot:  NonNull<Slot<T>>,
+    },
+    /// The first never-used slot, its chunk allocated.
+    New {
+        /// The slot's index.
+        index: usize,
+        /// The slot, not written yet.
+        slot:  NonNull<Slot<T>>,
+    },
+}
+
+impl<T> Vacancy<T> {
+    /// The slot's index.
+    const fn index(&self) -> usize {
+        match self {
+            Self::Reused { index, .. } | Self::New { index, .. } => *index,
         }
-        self.initialised += 1;
-        Ok(Key::new(index, Generation::FIRST))
     }
 }
 
