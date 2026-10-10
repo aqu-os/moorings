@@ -16,8 +16,8 @@
 //!   value, and none remains after removal.
 //! - **Generational validity**: Each key carries its slot's generation, which
 //!   increments on each reuse. A key to a removed value finds `None`, never a
-//!   subsequent value in the same slot. Slots that exhaust their generations are
-//!   retired.
+//!   subsequent value in the same slot. Slots that exhaust their generations
+//!   are retired.
 //! - **Stable addresses**: The table grows by allocating chunk arrays (8, 16,
 //!   32, ... slots), never moving existing entries. Values can be safely linked
 //!   into intrusive data structures.

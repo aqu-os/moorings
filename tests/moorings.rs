@@ -261,6 +261,10 @@ fn any_allocator_can_back_the_table() {
 }
 
 #[test]
+#[expect(
+    clippy::disallowed_types,
+    reason = "a host test of `Hash`: a hashing set is what it needs"
+)]
 fn key_and_slot_support_equality_and_hashing() {
     use std::collections::HashSet;
 
