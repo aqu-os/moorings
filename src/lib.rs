@@ -32,6 +32,9 @@
 //! - **Owner access (via [`SlotId`])**: Opaque identifier for a slot, allowing
 //!   the table's owner to reach or remove an entry without its key (e.g. an
 //!   event queue processing an expired timer).
+//!
+//! # Features
+#![doc = document_features::document_features!()]
 #![doc(issue_tracker_base_url = "https://github.com/aqu-os/aquos/issues")]
 // The README's code blocks run as doctests too (with alloc).
 #![cfg_attr(all(doctest, feature = "alloc"), doc = include_str!("../README.md"))]

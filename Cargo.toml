@@ -16,12 +16,16 @@ workspace = true
 
 [features]
 default = ["alloc"]
-# `GlobalChunks`: tables allocate from the global allocator (through its
-# fallible raw interface - stable Rust is enough).
+## `GlobalChunks`: tables allocate from the global allocator, fallibly. Works
+## on stable.
 alloc = []
-# `InAllocator`: tables allocate from any `core::alloc::Allocator`. Needs a
-# nightly toolchain (`allocator_api`).
+## `InAllocator`: tables allocate from any `core::alloc::Allocator`. Needs
+## nightly (`allocator_api`).
 nightly = []
+
+[dependencies]
+# The feature list in the crate docs.
+document-features.workspace = true
 
 [[test]]
 name = "moorings"
