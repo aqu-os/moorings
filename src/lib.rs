@@ -51,6 +51,7 @@ mod allocator;
 mod generation;
 mod key;
 mod table;
+mod table_id;
 
 #[cfg(feature = "alloc")]
 pub use allocator::GlobalChunks;

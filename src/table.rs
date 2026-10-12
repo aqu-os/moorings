@@ -8,6 +8,7 @@ use core::ptr::NonNull;
 #[cfg(feature = "alloc")]
 use crate::GlobalChunks;
 use crate::generation::Generation;
+use crate::table_id::TableId;
 use crate::{ChunkAllocator, InsertError, Key, SlotId};
 
 /// The first chunk's size, as a power of two: 8 slots. Each chunk after it is
@@ -76,6 +77,10 @@ pub struct Moorings<T, A: ChunkAllocator> {
     len: usize,
     /// Where the chunks came from, to give them back to.
     alloc: A,
+    /// This table's identity - stamped on every key and slot id handed out,
+    /// and checked on every access in debug builds.
+    #[cfg(debug_assertions)]
+    id: TableId,
     /// Ownership of the `T`s.
     _owned: PhantomData<T>,
 }
@@ -89,13 +94,16 @@ unsafe impl<T: Sync, A: ChunkAllocator + Sync> Sync for Moorings<T, A> {}
 
 impl<T, A: ChunkAllocator> Moorings<T, A> {
     /// An empty table, allocating from `alloc` once something is inserted.
-    pub const fn new_in(alloc: A) -> Self {
+    #[cfg_attr(not(debug_assertions), allow(clippy::missing_const_for_fn))]
+    pub fn new_in(alloc: A) -> Self {
         Self {
             chunks: [None; CHUNKS],
             initialised: 0,
             free: NO_SLOT,
             len: 0,
             alloc,
+            #[cfg(debug_assertions)]
+            id: TableId::new(),
             _owned: PhantomData,
         }
     }
@@ -119,12 +127,23 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
         let Some(vacancy) = self.vacancy() else {
             return Err(InsertError::new(parts));
         };
-        let value = build(parts, SlotId::new(vacancy.index()));
+        let value = build(
+            parts,
+            SlotId::new(
+                vacancy.index(),
+                #[cfg(debug_assertions)]
+                self.id,
+            ),
+        );
         Ok(self.occupy(vacancy, value))
     }
 
     /// The value `key` names, if it's still in the table.
     pub fn get(&self, key: &Key<T>) -> Option<&T> {
+        key.assert_table(
+            #[cfg(debug_assertions)]
+            self.id,
+        );
         // SAFETY: `slot` only hands out pointers to written slots, and
         // `&self` rules out a write while the reference lives.
         match unsafe { self.slot(key.index())?.as_ref() } {
@@ -139,6 +158,10 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
 
     /// The value `key` names, mutably, if it's still in the table.
     pub fn get_mut(&mut self, key: &Key<T>) -> Option<&mut T> {
+        key.assert_table(
+            #[cfg(debug_assertions)]
+            self.id,
+        );
         // SAFETY: `slot` only hands out pointers to written slots, and
         // `&mut self` rules out any other access while the reference lives.
         match unsafe { self.slot(key.index())?.as_mut() } {
@@ -159,11 +182,19 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
     /// Takes the value `key` names out of the table, if it's still there.
     /// The key is used up either way.
     pub fn remove(&mut self, key: Key<T>) -> Option<T> {
+        key.assert_table(
+            #[cfg(debug_assertions)]
+            self.id,
+        );
         self.take(key.index(), Some(key.generation()))
     }
 
     /// Whatever value is in `slot` now - see [`SlotId`](crate::SlotId).
     pub fn get_slot(&self, slot: SlotId<T>) -> Option<&T> {
+        slot.assert_table(
+            #[cfg(debug_assertions)]
+            self.id,
+        );
         // SAFETY: `slot` only hands out pointers to written slots, and
         // `&self` rules out a write while the reference lives.
         match unsafe { self.slot(slot.index())?.as_ref() } {
@@ -175,6 +206,10 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
     /// Whatever value is in `slot` now, mutably - see
     /// [`SlotId`](crate::SlotId).
     pub fn get_slot_mut(&mut self, slot: SlotId<T>) -> Option<&mut T> {
+        slot.assert_table(
+            #[cfg(debug_assertions)]
+            self.id,
+        );
         // SAFETY: `slot` only hands out pointers to written slots, and
         // `&mut self` rules out any other access while the reference lives.
         match unsafe { self.slot(slot.index())?.as_mut() } {
@@ -192,6 +227,10 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
     /// key - see [`SlotId`](crate::SlotId). Its key, wherever it is, finds
     /// nothing from then on.
     pub fn remove_slot(&mut self, slot: SlotId<T>) -> Option<T> {
+        slot.assert_table(
+            #[cfg(debug_assertions)]
+            self.id,
+        );
         self.take(slot.index(), None)
     }
 
@@ -307,7 +346,12 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
                 };
                 *slot = Slot::Occupied { generation, value };
                 self.free = next_free;
-                Key::new(index, generation)
+                Key::new(
+                    index,
+                    generation,
+                    #[cfg(debug_assertions)]
+                    self.id,
+                )
             },
             Vacancy::New { index, slot } => {
                 // SAFETY: in an allocated chunk (see `vacancy`), and never
@@ -319,7 +363,12 @@ impl<T, A: ChunkAllocator> Moorings<T, A> {
                     });
                 }
                 self.initialised += 1;
-                Key::new(index, Generation::FIRST)
+                Key::new(
+                    index,
+                    Generation::FIRST,
+                    #[cfg(debug_assertions)]
+                    self.id,
+                )
             },
         };
         self.len += 1;
@@ -358,7 +407,7 @@ impl<T> Vacancy<T> {
 #[cfg(feature = "alloc")]
 impl<T> Moorings<T, GlobalChunks> {
     /// An empty table on the global allocator.
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self::new_in(GlobalChunks)
     }
 }
@@ -434,13 +483,34 @@ mod tests {
         if let Slot::Occupied { generation, .. } = unsafe { slot.as_mut() } {
             *generation = last_generation;
         }
-        let last = Key::new(key.index(), last_generation);
+        let last = Key::new(
+            key.index(),
+            last_generation,
+            #[cfg(debug_assertions)]
+            table.id,
+        );
 
         assert_eq!(table.remove(last), Some(1));
         let next = table.try_insert(2).expect("memory");
         assert_eq!(next.index(), 1, "slot 0 is retired, not reused");
-        assert_eq!(table.get(&Key::new(0, last_generation)), None);
-        assert_eq!(table.get(&Key::new(0, Generation::RETIRED)), None);
+        assert_eq!(
+            table.get(&Key::new(
+                0,
+                last_generation,
+                #[cfg(debug_assertions)]
+                table.id,
+            )),
+            None
+        );
+        assert_eq!(
+            table.get(&Key::new(
+                0,
+                Generation::RETIRED,
+                #[cfg(debug_assertions)]
+                table.id,
+            )),
+            None
+        );
         assert_eq!(table.len(), 1);
     }
 }

@@ -4,6 +4,7 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use crate::generation::Generation;
+use crate::table_id::TableId;
 
 /// The one handle to a value in a [`Moorings<T, _>`](crate::Moorings): which
 /// slot it's in, and that slot's generation when it was put there.
@@ -27,6 +28,10 @@ pub struct Key<T> {
     index: usize,
     /// The slot's generation when the value was put there.
     generation: Generation,
+    /// Which table this key belongs to - checked on every access in debug
+    /// builds to catch cross-table misuse early.
+    #[cfg(debug_assertions)]
+    table_id: TableId,
     /// Ties the key to `T` without implying ownership, and opts out of the
     /// automatic `Send`/`Sync` derivation so the explicit impls below control
     /// it instead.
@@ -44,14 +49,25 @@ impl<T> Key<T> {
     /// The slot this key's value is in - for the table's owner to reach the
     /// value without the key (see [`SlotId`]).
     pub const fn slot(&self) -> SlotId<T> {
-        SlotId::new(self.index)
+        SlotId::new(
+            self.index,
+            #[cfg(debug_assertions)]
+            self.table_id,
+        )
     }
 
-    /// The key for slot `index` at `generation`.
-    pub(crate) const fn new(index: usize, generation: Generation) -> Self {
+    /// The key for slot `index` at `generation` in the table identified by
+    /// `table_id`.
+    pub(crate) const fn new(
+        index: usize,
+        generation: Generation,
+        #[cfg(debug_assertions)] table_id: TableId,
+    ) -> Self {
         Self {
             index,
             generation,
+            #[cfg(debug_assertions)]
+            table_id,
             _value: PhantomData,
         }
     }
@@ -64,6 +80,14 @@ impl<T> Key<T> {
     /// The slot's generation when the value was put there.
     pub(crate) const fn generation(&self) -> Generation {
         self.generation
+    }
+
+    /// Panics in debug builds if `self` does not belong to the table
+    /// identified by `id`. No-op in release builds.
+    #[inline]
+    pub(crate) fn assert_table(&self, #[cfg(debug_assertions)] id: TableId) {
+        #[cfg(debug_assertions)]
+        assert!(self.table_id == id, "key used on the wrong Moorings table");
     }
 }
 
@@ -78,11 +102,15 @@ impl<T> Key<T> {
 /// intrusive list node, say).
 pub struct SlotId<T> {
     /// The slot.
-    index:  usize,
+    index:    usize,
+    /// Which table this slot id belongs to - checked on every access in debug
+    /// builds to catch cross-table misuse early.
+    #[cfg(debug_assertions)]
+    table_id: TableId,
     /// Ties the slot id to `T` without implying ownership, and opts out of
     /// the automatic `Send`/`Sync` derivation so the explicit impls below
     /// control it instead.
-    _value: PhantomData<*const T>,
+    _value:   PhantomData<*const T>,
 }
 
 // SAFETY: same reasoning as for `Key<T>`: a `SlotId<T>` is just an integer
@@ -91,10 +119,15 @@ unsafe impl<T> Send for SlotId<T> {}
 unsafe impl<T> Sync for SlotId<T> {}
 
 impl<T> SlotId<T> {
-    /// Slot `index`.
-    pub(crate) const fn new(index: usize) -> Self {
+    /// Slot `index` in the table identified by `table_id`.
+    pub(crate) const fn new(
+        index: usize,
+        #[cfg(debug_assertions)] table_id: TableId,
+    ) -> Self {
         Self {
             index,
+            #[cfg(debug_assertions)]
+            table_id,
             _value: PhantomData,
         }
     }
@@ -102,6 +135,17 @@ impl<T> SlotId<T> {
     /// The slot.
     pub(crate) const fn index(self) -> usize {
         self.index
+    }
+
+    /// Panics in debug builds if `self` does not belong to the table
+    /// identified by `id`. No-op in release builds.
+    #[inline]
+    pub(crate) fn assert_table(&self, #[cfg(debug_assertions)] id: TableId) {
+        #[cfg(debug_assertions)]
+        assert!(
+            self.table_id == id,
+            "slot id used on the wrong Moorings table"
+        );
     }
 }
 
