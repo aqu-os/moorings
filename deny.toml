@@ -1,0 +1,65 @@
+# cargo-deny configuration, shared by every first-party crate.
+#
+# only applies to crates with publish=true.
+
+[graph]
+all-features = false
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+[advisories]
+ignore = []
+
+[licenses]
+# Only genuinely permissive licenses
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+]
+# Default is "warn": complains whenever an allowed license isn't actually
+# used by a given crate. Since deny.toml is one shared allow-list across
+# crates with very different dependency footprints (units/estuary have
+# almost no third-party deps at all), that's expected and not worth a
+# warning on every run
+unused-allowed-license = "allow"
+confidence-threshold = 0.8
+exceptions = []
+
+[licenses.private]
+# First-party Aquos crates (path dependencies within this repo) aren't
+# checked for their own `license` field here - that's a separate question
+# from third-party dependency compliance, and the Aquifer License itself
+# isn't finalized/published yet. Relies on those crates being `publish =
+# false` (see books/depth/src/for_developers/dependency_licensing.md).
+ignore = true
+registries = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
+allow = []
+allow-workspace = true
+deny = []
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+
+[sources.allow-org]
+github = []
+gitlab = []
+bitbucket = []
