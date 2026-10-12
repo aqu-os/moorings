@@ -27,16 +27,18 @@ pub struct Key<T> {
     index: usize,
     /// The slot's generation when the value was put there.
     generation: Generation,
-    /// What the table holds, without affecting `Send`/`Sync`.
-    ///
-    /// `PhantomData<fn() -> T>` (not `PhantomData<T>`) keeps `Key<T>:
-    /// Send + Sync` for all `T`, even non-`Send`/non-`Sync` ones like
-    /// `Cell<u32>`. That's correct: a key holds no `T` data - just two
-    /// integers - so it's safe to move or share across threads by itself.
-    /// `Moorings<T, _>` still requires `T: Send`/`T: Sync` because it
-    /// actually owns the values.
-    _value: PhantomData<fn() -> T>,
+    /// Ties the key to `T` without implying ownership, and opts out of the
+    /// automatic `Send`/`Sync` derivation so the explicit impls below control
+    /// it instead.
+    _value: PhantomData<*const T>,
 }
+
+// SAFETY: `Key<T>` holds no `T` - just a slot index and a generation counter,
+// both plain integers. There is nothing to race on or move unsafely, regardless
+// of what `T` itself is. `Moorings<T, _>` still gates on `T: Send`/`T: Sync`
+// because it *owns* the values; the key is merely a lookup token.
+unsafe impl<T> Send for Key<T> {}
+unsafe impl<T> Sync for Key<T> {}
 
 impl<T> Key<T> {
     /// The slot this key's value is in - for the table's owner to reach the
@@ -77,11 +79,16 @@ impl<T> Key<T> {
 pub struct SlotId<T> {
     /// The slot.
     index:  usize,
-    /// What the table holds, without affecting `Send`/`Sync`. Same reasoning
-    /// as [`Key`]: a slot id holds no `T` data, so it's unconditionally
-    /// `Send + Sync`.
-    _value: PhantomData<fn() -> T>,
+    /// Ties the slot id to `T` without implying ownership, and opts out of
+    /// the automatic `Send`/`Sync` derivation so the explicit impls below
+    /// control it instead.
+    _value: PhantomData<*const T>,
 }
+
+// SAFETY: same reasoning as for `Key<T>`: a `SlotId<T>` is just an integer
+// index with no `T` data inside.
+unsafe impl<T> Send for SlotId<T> {}
+unsafe impl<T> Sync for SlotId<T> {}
 
 impl<T> SlotId<T> {
     /// Slot `index`.
