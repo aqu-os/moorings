@@ -27,6 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install toolchain (from rust-toolchain.toml)
-        run: rustup toolchain install nightly --profile minimal --component clippy
+        run: rustup toolchain install
       - name: Run clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings

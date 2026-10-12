@@ -55,12 +55,12 @@ unsafe impl ChunkAllocator for GlobalChunks {
 }
 
 /// Any [`core::alloc::Allocator`] as a [`ChunkAllocator`].
-#[cfg(feature = "nightly")]
+#[cfg(feature = "allocator-api")]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct InAllocator<A>(pub A);
 
 // SAFETY: forwards to `A`, whose contract (`Allocator`'s) is this one.
-#[cfg(feature = "nightly")]
+#[cfg(feature = "allocator-api")]
 unsafe impl<A: core::alloc::Allocator> ChunkAllocator for InAllocator<A> {
     fn allocate(&self, layout: Layout) -> Option<NonNull<u8>> {
         self.0.allocate(layout).ok().map(NonNull::cast)

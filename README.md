@@ -43,7 +43,7 @@ another boat is tied there by the time you come back, your ticket is stale.
 - **Allocation is always fallible.** Running out of memory hands the value
   back, instead of aborting. The memory comes from a [`ChunkAllocator`]: the
   global allocator ([`GlobalChunks`], with the default `alloc` feature) or
-  any `core::alloc::Allocator` (`InAllocator`, with the `nightly` feature).
+  any `core::alloc::Allocator` (`InAllocator`, with the `allocator-api` feature).
 
 Or specify an allocator explicitly:
 

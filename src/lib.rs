@@ -1,5 +1,4 @@
 #![no_std]
-#![cfg_attr(feature = "nightly", feature(allocator_api))]
 // Lints: the root Cargo.toml's `[workspace.lints]`.
 
 //! A generational handle table: [`Moorings`] owns its values, hands out one
@@ -55,7 +54,7 @@ mod table_id;
 
 #[cfg(feature = "alloc")]
 pub use allocator::GlobalChunks;
-#[cfg(feature = "nightly")]
+#[cfg(feature = "allocator-api")]
 pub use allocator::InAllocator;
 pub use allocator::{ChunkAllocator, InsertError};
 pub use key::{Key, SlotId};

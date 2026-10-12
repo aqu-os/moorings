@@ -35,7 +35,7 @@ enum Slot<T> {
         generation: Generation,
         /// The next empty slot on the free list, or [`NO_SLOT`] (also for a
         /// retired slot, which isn't on the list at all).
-        next_free:  usize,
+        next_free: usize,
     },
 }
 
@@ -384,14 +384,14 @@ enum Vacancy<T> {
         /// The slot's index.
         index: usize,
         /// The slot.
-        slot:  NonNull<Slot<T>>,
+        slot: NonNull<Slot<T>>,
     },
     /// The first never-used slot, its chunk allocated.
     New {
         /// The slot's index.
         index: usize,
         /// The slot, not written yet.
-        slot:  NonNull<Slot<T>>,
+        slot: NonNull<Slot<T>>,
     },
 }
 

@@ -1,6 +1,5 @@
 //! A table's behaviour from the outside: keys, generations, values that never
 //! move, values dropped exactly once, and running out of memory.
-#![cfg_attr(feature = "nightly", feature(allocator_api))]
 
 use std::alloc::Layout;
 use std::cell::Cell;
@@ -279,7 +278,7 @@ fn debug_shows_how_full_it_is() {
     );
 }
 
-#[cfg(feature = "nightly")]
+#[cfg(feature = "allocator-api")]
 #[test]
 fn any_allocator_can_back_the_table() {
     use std::alloc::Global;

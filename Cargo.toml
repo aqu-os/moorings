@@ -4,7 +4,7 @@ description = "Generational handle tables for no_std: values that never move, un
 version = "0.1.1"
 edition = "2024"
 authors = ["Marcel Lambert <marcel_lambert@ymail.com>"]
-rust-version = "1.95.0"
+rust-version = "1.99"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/aqu-os/aquos"
 readme = "README.md"
@@ -32,9 +32,9 @@ default = ["alloc"]
 ## `GlobalChunks`: tables allocate from the global allocator, fallibly. Works
 ## on stable.
 alloc = []
-## `InAllocator`: tables allocate from any `core::alloc::Allocator`. Needs
-## nightly (`allocator_api`).
-nightly = []
+## `InAllocator`: tables allocate from any `core::alloc::Allocator`.
+## Requires Rust 1.100+ (stabilised `allocator_api`).
+allocator-api = []
 
 [dependencies]
 # The feature list in the crate docs.

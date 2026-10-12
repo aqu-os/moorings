@@ -102,7 +102,7 @@ impl<T> Key<T> {
 /// intrusive list node, say).
 pub struct SlotId<T> {
     /// The slot.
-    index:    usize,
+    index: usize,
     /// Which table this slot id belongs to - checked on every access in debug
     /// builds to catch cross-table misuse early.
     #[cfg(debug_assertions)]
@@ -110,7 +110,7 @@ pub struct SlotId<T> {
     /// Ties the slot id to `T` without implying ownership, and opts out of
     /// the automatic `Send`/`Sync` derivation so the explicit impls below
     /// control it instead.
-    _value:   PhantomData<*const T>,
+    _value: PhantomData<*const T>,
 }
 
 // SAFETY: same reasoning as for `Key<T>`: a `SlotId<T>` is just an integer
