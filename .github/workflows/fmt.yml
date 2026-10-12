@@ -1,0 +1,32 @@
+name: Code format
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rustfmt:
+    name: rustfmt (nightly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustfmt.toml uses options that are only available on nightly.
+      - name: Install nightly rustfmt
+        run: rustup toolchain install nightly --profile minimal --component rustfmt
+      - name: Check formatting
+        run: cargo +nightly fmt --all --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
