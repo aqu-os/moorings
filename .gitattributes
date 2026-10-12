@@ -1,0 +1,5 @@
+# LF line endings everywhere, in the repository and in working copies -
+# like rustfmt.toml's `newline_style = "Unix"`. Without this, git's
+# core.autocrlf on Windows expects CRLF in the working copy, and files that
+# tools write with LF show up as modified without any change.
+* text=auto eol=lf
