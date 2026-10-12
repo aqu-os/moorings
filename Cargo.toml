@@ -1,18 +1,31 @@
 [package]
 name = "moorings"
 description = "Generational handle tables for no_std: values that never move, unique keys that can't outlive what they name, and only fallible allocation."
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
-rust-version.workspace = true
+version = "0.1.1"
+edition = "2024"
+authors = ["Marcel Lambert <marcel_lambert@ymail.com>"]
+rust-version = "1.95.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/aqu-os/aquos"
 readme = "README.md"
 keywords = ["generational", "slotmap", "handle", "no-std", "arena"]
 categories = ["data-structures", "no-std", "memory-management"]
 
-[lints]
-workspace = true
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+
+
+[lints.rustdoc]
+broken_intra_doc_links = "warn"
+
+[lints.clippy]
+missing_docs_in_private_items = "warn"
+# Kernel stacks are small and fixed-size; a frame or array that doesn't fit overflows them
+# silently.
+large_stack_frames = "forbid"
+large_stack_arrays = "forbid"
 
 [features]
 default = ["alloc"]
@@ -25,7 +38,7 @@ nightly = []
 
 [dependencies]
 # The feature list in the crate docs.
-document-features.workspace = true
+document-features = "0.2.12"
 
 [[test]]
 name = "moorings"
