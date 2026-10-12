@@ -28,6 +28,13 @@ pub struct Key<T> {
     /// The slot's generation when the value was put there.
     generation: Generation,
     /// What the table holds, without affecting `Send`/`Sync`.
+    ///
+    /// `PhantomData<fn() -> T>` (not `PhantomData<T>`) keeps `Key<T>:
+    /// Send + Sync` for all `T`, even non-`Send`/non-`Sync` ones like
+    /// `Cell<u32>`. That's correct: a key holds no `T` data - just two
+    /// integers - so it's safe to move or share across threads by itself.
+    /// `Moorings<T, _>` still requires `T: Send`/`T: Sync` because it
+    /// actually owns the values.
     _value: PhantomData<fn() -> T>,
 }
 
@@ -70,7 +77,9 @@ impl<T> Key<T> {
 pub struct SlotId<T> {
     /// The slot.
     index:  usize,
-    /// What the table holds, without affecting `Send`/`Sync`.
+    /// What the table holds, without affecting `Send`/`Sync`. Same reasoning
+    /// as [`Key`]: a slot id holds no `T` data, so it's unconditionally
+    /// `Send + Sync`.
     _value: PhantomData<fn() -> T>,
 }
 
